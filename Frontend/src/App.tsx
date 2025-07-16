@@ -1,4 +1,5 @@
 import React from "react";
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import { Layout } from "./layout/Layout";
@@ -19,6 +20,7 @@ import "@fontsource/public-sans/500.css";
 import "@fontsource/public-sans/600.css";
 import "@fontsource/public-sans/700.css";
 import "@fontsource/public-sans/800.css";
+import '@rainbow-me/rainbowkit/styles.css';
 import "./global.css";
 
 const router = createBrowserRouter([
@@ -80,6 +82,9 @@ export function App() {
   return (
     <React.Fragment>
       <RouterProvider router={router} />
+      <div className="fixed right-4 bottom-4 z-[9999] flex flex-col items-start space-y-2">
+        <ConnectButton showBalance={false} />
+      </div>
     </React.Fragment>
   );
 }

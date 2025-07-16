@@ -1,4 +1,5 @@
 import React from "react";
+import { WalletInfo } from 'components/WalletInfo';
 import cx from "classnames";
 import { Link, Outlet, useMatch } from "react-router-dom";
 
@@ -21,7 +22,7 @@ export const Sidelink = (props: SidelinkProps) => {
   );
 };
 
-export function Sidebar({userData}: any) {
+export function Sidebar({ userData }: any) {
   return (
     <div className='flex min-h-full flex-col'>
       <h1 className='text-2xl font-extrabold text-blue-high'>LOGO</h1>
@@ -49,6 +50,7 @@ export function Sidebar({userData}: any) {
           IconComp={icons.Settings}
           text='Settings'
         />
+        <WalletInfo />
       </nav>
     </div>
   );

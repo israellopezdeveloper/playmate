@@ -11,7 +11,7 @@ app.use(cors());
 const bcrypt = require("bcryptjs");
 app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: false }));
-app.use(express.static(__dirname + '/public'));
+app.use(express.static(__dirname + "/public"));
 
 const jwt = require("jsonwebtoken");
 var nodemailer = require("nodemailer");
@@ -19,10 +19,8 @@ var nodemailer = require("nodemailer");
 const JWT_SECRET =
   "hvdvay6ert72839289()aiyg8t87qt72393293883uhefiuh78ttq3ifi78272jbkj?[]]pou89ywe";
 
-/*const mongoUrl =
-  "mongodb+srv://adarsh:adarsh@cluster0.zllye.mongodb.net/?retryWrites=true&w=majority";
- */
 const mongoUrl =
+  process.env.MONGO_URL ||
   "mongodb+srv://mcplustexturepack:6BV8j5QJWAxy5va@cluster0.528peek.mongodb.net/?retryWrites=true&w=majority";
 
 mongoose
@@ -52,8 +50,9 @@ const UserFriends = mongoose.model("UserFriends");
 const Event = mongoose.model("EventDetails");
 const UserEvents = mongoose.model("UserEvents");
 
-app.post("/register", async (req, res) => {                               // done
-  let { fname, lname, email, password, userType } = req.body;
+app.post("/register", async (req, res) => {
+  let { fname, lname, email, password, userType, walletAddress, chainId } =
+    req.body;
   email = email.toLowerCase();
 
   const encryptedPassword = await bcrypt.hash(password, 10);
@@ -64,8 +63,14 @@ app.post("/register", async (req, res) => {                               // don
       return res.json({ error: "User already Exists" });
     }
 
-    const profilePics = ['http://127.0.0.1:5000/footballer1.jpg', 'http://127.0.0.1:5000/footballer2.jpg', 'http://127.0.0.1:5000/footballer3.jpg', 'http://127.0.0.1:5000/footballer4.jpg']
-    const randomProfilePic = profilePics[Math.floor(Math.random() * profilePics.length)];
+    const profilePics = [
+      "http://127.0.0.1:5000/footballer1.jpg",
+      "http://127.0.0.1:5000/footballer2.jpg",
+      "http://127.0.0.1:5000/footballer3.jpg",
+      "http://127.0.0.1:5000/footballer4.jpg",
+    ];
+    const randomProfilePic =
+      profilePics[Math.floor(Math.random() * profilePics.length)];
 
     await User.create({
       fname,
@@ -73,10 +78,12 @@ app.post("/register", async (req, res) => {                               // don
       email,
       password: encryptedPassword,
       userType,
-      position: 'Not Set Position',
-      description: 'Hey there! Welcome to my profile.',
+      position: "Not Set Position",
+      description: "Hey there! Welcome to my profile.",
       profilePic: randomProfilePic,
       profileBanner: randomProfilePic,
+      walletAddress: walletAddress,
+      chainId: chainId,
     });
     const token = jwt.sign({ email: email }, JWT_SECRET, {
       expiresIn: "4h",
@@ -88,7 +95,8 @@ app.post("/register", async (req, res) => {                               // don
   }
 });
 
-app.post("/login-user", async (req, res) => {                           // done
+app.post("/login-user", async (req, res) => {
+  // done
   let { email, password } = req.body;
   email = email.toLowerCase();
 
@@ -110,7 +118,35 @@ app.post("/login-user", async (req, res) => {                           // done
   res.json({ status: "error", error: "Invalid Password" });
 });
 
-app.post("/updateProfile", async (req, res) => {                            // done
+app.post("/login-wallet", async (req, res) => {
+  const { walletAddress, chainId } = req.body;
+
+  if (!walletAddress || !chainId) {
+    return res
+      .status(400)
+      .json({ error: "Wallet address and chain Id not available" });
+  }
+
+  try {
+    const user = await User.findOne({ walletAddress, chainId });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const token = jwt.sign({ email: user.email }, JWT_SECRET, {
+      expiresIn: "4h",
+    });
+
+    return res.json({ status: "ok", data: token });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ status: "error", data: error });
+  }
+});
+
+app.post("/updateProfile", async (req, res) => {
+  // done
   let { token, fname, lname, email, profilePic } = req.body;
 
   const user = jwt.verify(token, JWT_SECRET, (err, res) => {
@@ -148,7 +184,7 @@ app.post("/updateProfile", async (req, res) => {                            // d
             email: email,
             profilePic: profilePic,
           },
-        }
+        },
       )
         .then((data) => {
           res.send({ status: "ok", data: "Successfully Updated Profile" });
@@ -162,7 +198,8 @@ app.post("/updateProfile", async (req, res) => {                            // d
     });
 });
 
-app.post("/changePassword", async (req, res) => {                     // done
+app.post("/changePassword", async (req, res) => {
+  // done
   let { token, oldPassword, newPassword } = req.body;
 
   const user = jwt.verify(token, JWT_SECRET, (err, res) => {
@@ -179,7 +216,7 @@ app.post("/changePassword", async (req, res) => {                     // done
   User.findOne({ email: userEmail })
     .then(async (data) => {
       const userId = data._id;
-      
+
       if (await bcrypt.compare(oldPassword, data.password)) {
         const encryptedPassword = await bcrypt.hash(newPassword, 10);
         User.updateOne(
@@ -188,7 +225,7 @@ app.post("/changePassword", async (req, res) => {                     // done
             $set: {
               password: encryptedPassword,
             },
-          }
+          },
         )
           .then((data) => {
             res.send({ status: "ok", data: "Successfully Updated Password" });
@@ -236,22 +273,28 @@ app.post("/joinTeam/:teamId/:inviteCode", async (req, res) => {
     User.findOne({ email: userEmail })
       .then((data) => {
         const userId = data._id;
-        
+
         // Check if the user is already a member of the team
         TeamMembers.findOne({ user: userId, team: teamId })
           .then((data) => {
             if (data) {
-              res.send({ status: "error", data: "You are already a member of the team!" });
+              res.send({
+                status: "error",
+                data: "You are already a member of the team!",
+              });
             } else {
               // Add the user to the team
               TeamMembers.create({
                 team: teamId,
                 user: userId,
-                position: 'Not Set Position',
-                description: 'Not Set Description',
-                role: 'Member'
+                position: "Not Set Position",
+                description: "Not Set Description",
+                role: "Member",
               });
-              res.send({ status: "ok", data: "Successfully Added to the team" });
+              res.send({
+                status: "ok",
+                data: "Successfully Added to the team",
+              });
             }
           })
           .catch((error) => {
@@ -260,15 +303,15 @@ app.post("/joinTeam/:teamId/:inviteCode", async (req, res) => {
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
   }
 });
 
-app.post("/sendFriendRequest", async (req, res) => {              // done
+app.post("/sendFriendRequest", async (req, res) => {
+  // done
   const { token, friendId } = req.body;
 
   try {
@@ -283,7 +326,7 @@ app.post("/sendFriendRequest", async (req, res) => {              // done
       return res.send({ status: "error", data: "token expired" });
     }
     const userEmail = user.email;
-    
+
     // Get the user id from the user email
     User.findOne({ email: userEmail })
       .then((data) => {
@@ -293,20 +336,28 @@ app.post("/sendFriendRequest", async (req, res) => {              // done
         UserFriends.findOne({ user: userId, friend: friendId })
           .then((data) => {
             if (data) {
-              if(data.status === 'Pending'){
-                return res.send({ status: "error", data: "You have already sent a friend request to this user!" });
-              }
-              else if(data.status === 'Accepted') {
-                res.send({ status: "error", data: "You are already friends with this user!" });
+              if (data.status === "Pending") {
+                return res.send({
+                  status: "error",
+                  data: "You have already sent a friend request to this user!",
+                });
+              } else if (data.status === "Accepted") {
+                res.send({
+                  status: "error",
+                  data: "You are already friends with this user!",
+                });
               }
             } else {
               // Create the friend with the status Pending
               UserFriends.create({
                 user: userId,
                 friend: friendId,
-                status: 'Pending',
+                status: "Pending",
               });
-              res.send({ status: "ok", data: "Successfully sent friend request" });
+              res.send({
+                status: "ok",
+                data: "Successfully sent friend request",
+              });
             }
           })
           .catch((error) => {
@@ -315,15 +366,15 @@ app.post("/sendFriendRequest", async (req, res) => {              // done
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
   }
 });
 
-app.post("/acceptFriendRequest", async (req, res) => {                // done
+app.post("/acceptFriendRequest", async (req, res) => {
+  // done
   const { token, friendId } = req.body;
 
   try {
@@ -349,37 +400,46 @@ app.post("/acceptFriendRequest", async (req, res) => {                // done
           .then((data) => {
             if (data) {
               // Update the friend status to Accepted
-              UserFriends.updateOne({ user: friendId, friend: userId }, { status: 'Accepted' })
+              UserFriends.updateOne(
+                { user: friendId, friend: userId },
+                { status: "Accepted" },
+              )
                 .then((data) => {
                   UserFriends.create({
                     user: userId,
                     friend: friendId,
-                    status: 'Accepted',
+                    status: "Accepted",
                   });
-                  res.send({ status: "ok", data: "Successfully accepted friend request" });
+                  res.send({
+                    status: "ok",
+                    data: "Successfully accepted friend request",
+                  });
                 })
                 .catch((error) => {
                   console.log(error);
                 });
             } else {
-              res.send({ status: "error", data: "You need to send a Friend Request first!" });
+              res.send({
+                status: "error",
+                data: "You need to send a Friend Request first!",
+              });
             }
           })
-          .catch((error) => { 
+          .catch((error) => {
             console.log(error);
           });
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
   }
 });
 
-app.post("/rejectFriendRequest", async (req, res) => {              // done
+app.post("/rejectFriendRequest", async (req, res) => {
+  // done
   const { token, friendId } = req.body;
 
   try {
@@ -407,24 +467,28 @@ app.post("/rejectFriendRequest", async (req, res) => {              // done
               // Delete the friend request
               UserFriends.deleteOne({ user: friendId, friend: userId })
                 .then((data) => {
-                  res.send({ status: "ok", data: "Successfully rejected friend request" });
+                  res.send({
+                    status: "ok",
+                    data: "Successfully rejected friend request",
+                  });
                 })
                 .catch((error) => {
                   console.log(error);
                 });
-
             } else {
-              res.send({ status: "error", data: "You need to send a Friend Request first!" });
+              res.send({
+                status: "error",
+                data: "You need to send a Friend Request first!",
+              });
             }
           })
-          .catch((error) => { 
+          .catch((error) => {
             console.log(error);
           });
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -465,34 +529,29 @@ app.post("/getFriendStatus", async (req, res) => {
 
             // Get the friend request from the user
             UserFriends.findOne({ user: userId, friend: friendId })
-            .then((data) => {
-              if (data) {
-                foundStatus = true;
-                status = data.status;
-              }
+              .then((data) => {
+                if (data) {
+                  foundStatus = true;
+                  status = data.status;
+                }
 
-              if (foundStatus) {
-                res.send({ status: "ok", data: status });
-              }
-              else {
-                res.send({ status: "ok", data: "No friend request found" });
-              }
-            })
-            .catch((error) => {
-              console.log(error);
-            }
-          );
-
+                if (foundStatus) {
+                  res.send({ status: "ok", data: status });
+                } else {
+                  res.send({ status: "ok", data: "No friend request found" });
+                }
+              })
+              .catch((error) => {
+                console.log(error);
+              });
           })
           .catch((error) => {
             console.log(error);
           });
-
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -514,12 +573,12 @@ app.post("/removeFriend", async (req, res) => {
       return res.send({ status: "error", data: "token expired" });
     }
     const userEmail = user.email;
-    
+
     // Get the user id from the user email
     User.findOne({ email: userEmail })
       .then((data) => {
         const userId = data._id;
-        
+
         // Get the friend request from the friend
         UserFriends.findOne({ user: friendId, friend: userId })
           .then((data) => {
@@ -527,27 +586,35 @@ app.post("/removeFriend", async (req, res) => {
               // Delete the friend request
               UserFriends.deleteOne({ user: friendId, friend: userId })
                 .then((data) => {
-                  res.send({ status: "ok", data: "Successfully removed friend" });
+                  res.send({
+                    status: "ok",
+                    data: "Successfully removed friend",
+                  });
                 })
                 .catch((error) => {
                   console.log(error);
                 });
-            }
-            else {
+            } else {
               // Get the friend request from the user
               UserFriends.findOne({ user: userId, friend: friendId })
                 .then((data) => {
-                  if(data) {
+                  if (data) {
                     // Delete the friend request
                     UserFriends.deleteOne({ user: userId, friend: friendId })
                       .then((data) => {
-                        res.send({ status: "ok", data: "Successfully removed friend" });
+                        res.send({
+                          status: "ok",
+                          data: "Successfully removed friend",
+                        });
                       })
                       .catch((error) => {
                         console.log(error);
                       });
                   } else {
-                    res.send({ status: "error", data: "No friend request found" });
+                    res.send({
+                      status: "error",
+                      data: "No friend request found",
+                    });
                   }
                 })
                 .catch((error) => {
@@ -561,15 +628,15 @@ app.post("/removeFriend", async (req, res) => {
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
   }
 });
 
-app.post("/getFriends", async (req, res) => {                         // done
+app.post("/getFriends", async (req, res) => {
+  // done
   const { token } = req.body;
 
   try {
@@ -591,7 +658,7 @@ app.post("/getFriends", async (req, res) => {                         // done
         const userId = data._id;
 
         // Get the friends of the user
-        UserFriends.find({ user: userId, status: 'Accepted' })
+        UserFriends.find({ user: userId, status: "Accepted" })
           .then((data) => {
             let friends = [];
             data.forEach((friend) => {
@@ -599,7 +666,7 @@ app.post("/getFriends", async (req, res) => {                         // done
             });
 
             // Get the friends of the user
-            UserFriends.find({ friend: userId, status: 'Accepted' })
+            UserFriends.find({ friend: userId, status: "Accepted" })
               .then((data) => {
                 data.forEach((friend) => {
                   friends.push(friend.user);
@@ -620,19 +687,18 @@ app.post("/getFriends", async (req, res) => {                         // done
           .catch((error) => {
             console.log(error);
           });
-
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
   }
 });
-              
-app.post("/getFriendRequests", async (req, res) => {                  // done
+
+app.post("/getFriendRequests", async (req, res) => {
+  // done
   const { token } = req.body;
 
   try {
@@ -647,18 +713,18 @@ app.post("/getFriendRequests", async (req, res) => {                  // done
       return res.send({ status: "error", data: "token expired" });
     }
     const userEmail = user.email;
-    
+
     // Get the user id from the user email
     User.findOne({ email: userEmail })
       .then((data) => {
         const userId = data._id;
 
         // Get the friend requests of the user
-        UserFriends.find({ friend: userId, status: 'Pending' })
+        UserFriends.find({ friend: userId, status: "Pending" })
           .then((data) => {
             let friendRequests = [];
             let friendRequestsUserIds = [];
-            
+
             data.forEach((friendRequest) => {
               friendRequestsUserIds.push(friendRequest.user);
               friendRequests.push(friendRequest);
@@ -671,9 +737,11 @@ app.post("/getFriendRequests", async (req, res) => {                  // done
                   // Get the created at date of the friend request
                   let requestDate = "";
                   friendRequests.forEach((friendRequest) => {
-                    if (friendRequest.user._id.toString() == friend._id.toString()) {
+                    if (
+                      friendRequest.user._id.toString() == friend._id.toString()
+                    ) {
                       requestDate = friendRequest.createdAt;
-                      console.log(requestDate)
+                      console.log(requestDate);
                     }
                   });
 
@@ -683,12 +751,11 @@ app.post("/getFriendRequests", async (req, res) => {                  // done
                     lname: friend.lname,
                     profilePic: friend.profilePic,
                     requestedAt: requestDate,
-                  }
+                  };
                   friendRequestsData.push(friendData);
                 });
 
                 res.send({ status: "ok", data: friendRequestsData });
-
               })
               .catch((error) => {
                 console.log(error);
@@ -697,18 +764,15 @@ app.post("/getFriendRequests", async (req, res) => {                  // done
           .catch((error) => {
             console.log(error);
           });
-
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-      }
-    );
+      });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
   }
 });
-
 
 app.post("/getUserData", async (req, res) => {
   const { token } = req.body;
@@ -726,18 +790,24 @@ app.post("/getUserData", async (req, res) => {
     const useremail = user.email;
     User.findOne({ email: useremail })
       .then(async (data) => {
-        const friends = await UserFriends.find({ user: data._id, status: 'Accepted' })
-        res.send({ status: "ok", data: {...data._doc, numFriends: friends.length} });
+        const friends = await UserFriends.find({
+          user: data._id,
+          status: "Accepted",
+        });
+        res.send({
+          status: "ok",
+          data: { ...data._doc, numFriends: friends.length },
+        });
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
       });
-  } catch (error) { }
+  } catch (error) {}
 });
 
 app.post("/getUserData/:id", async (req, res) => {
   const { token } = req.body;
-  let userId = req.params.id
+  let userId = req.params.id;
   try {
     const user = jwt.verify(token, JWT_SECRET, (err, res) => {
       if (err) {
@@ -748,10 +818,15 @@ app.post("/getUserData/:id", async (req, res) => {
     if (user == "token expired") {
       return res.send({ status: "error", data: "token expired" });
     }
-    const order = await User.findOne({email: user.email});
-    User.findOne({ "_id": userId })
+    const order = await User.findOne({ email: user.email });
+    User.findOne({ _id: userId })
       .then(async (data) => {
-        const friends = await UserFriends.find({$or: [{ user: userId, status: 'Accepted' }, { friend: userId, status: 'Accepted' }]})
+        const friends = await UserFriends.find({
+          $or: [
+            { user: userId, status: "Accepted" },
+            { friend: userId, status: "Accepted" },
+          ],
+        });
         let userData = {
           id: data._id,
           fname: data.fname,
@@ -763,15 +838,15 @@ app.post("/getUserData/:id", async (req, res) => {
           profileBanner: data.profileBanner,
           createdAt: data.createdAt,
           numFriends: friends.length,
-          own: userId === order._id.toString()
-        }
+          own: userId === order._id.toString(),
+        };
         res.send({ status: "ok", data: userData });
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
       });
-  } catch (error) { 
-    console.log(error)
+  } catch (error) {
+    console.log(error);
   }
 });
 
@@ -779,7 +854,6 @@ app.post("/getTeamData/:id", async (req, res) => {
   let teamId = req.params.id;
   const { token } = req.body;
   try {
-
     const user = jwt.verify(token, JWT_SECRET, (err, res) => {
       if (err) {
         return "token expired";
@@ -793,58 +867,57 @@ app.post("/getTeamData/:id", async (req, res) => {
     const useremail = user.email;
     User.findOne({ email: useremail })
       .then((user) => {
-        
         // Get the member count of the team
-        TeamMembers.countDocuments({ "team": teamId })
-        .then((memberCount) => {
-          
-          Team.findOne({ "_id": teamId })
-          .then((teamDataTemp) => {
-            let teamData = {
-              id: teamDataTemp._id,
-              name: teamDataTemp.name,
-              sportsType: teamDataTemp.sportsType,
-              gender: teamDataTemp.gender,
-              description: teamDataTemp.description,
-              profilePic: teamDataTemp.profilePic,
-              profileBanner: teamDataTemp.profileBanner,
-              memberCount: memberCount,
-              createdAt: teamDataTemp.createdAt,
-            }
+        TeamMembers.countDocuments({ team: teamId })
+          .then((memberCount) => {
+            Team.findOne({ _id: teamId })
+              .then((teamDataTemp) => {
+                let teamData = {
+                  id: teamDataTemp._id,
+                  name: teamDataTemp.name,
+                  sportsType: teamDataTemp.sportsType,
+                  gender: teamDataTemp.gender,
+                  description: teamDataTemp.description,
+                  profilePic: teamDataTemp.profilePic,
+                  profileBanner: teamDataTemp.profileBanner,
+                  memberCount: memberCount,
+                  createdAt: teamDataTemp.createdAt,
+                };
 
-            // Check if the user is a the admin of the team
-            TeamMembers.findOne({ "team": teamId, "user": user._id, "role": "Admin" })
-            .then((data) => {
-              if (data) {
-                teamData.isAdmin = true;
-                teamData.inviteCode = teamDataTemp.inviteCode;
-              } else {
-                teamData.isAdmin = false;
-              }
+                // Check if the user is a the admin of the team
+                TeamMembers.findOne({
+                  team: teamId,
+                  user: user._id,
+                  role: "Admin",
+                })
+                  .then((data) => {
+                    if (data) {
+                      teamData.isAdmin = true;
+                      teamData.inviteCode = teamDataTemp.inviteCode;
+                    } else {
+                      teamData.isAdmin = false;
+                    }
 
-              // Return the team data
-              res.send({ status: "ok", data: teamData });
+                    // Return the team data
+                    res.send({ status: "ok", data: teamData });
+                  })
+                  .catch((error) => {
+                    res.send({ status: "error", data: error });
+                  });
+              })
+              .catch((error) => {
+                res.send({ status: "error", data: error });
+              });
           })
           .catch((error) => {
             res.send({ status: "error", data: error });
           });
-          
-        })
-        .catch((error) => {
-          res.send({ status: "error", data: error });
-        });
-
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
-    });
-  })
-  .catch((error) => {
-    res.send({ status: "error", data: error });
-});
-
-  } catch (error) { 
-    console.log(error)
+      });
+  } catch (error) {
+    console.log(error);
   }
 });
 
@@ -856,7 +929,7 @@ app.post("/picUpload", async (req, res) => {
   // Give the file a unique name
   const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
   const filename = uniqueSuffix + "-" + file.name;
-  
+
   try {
     const user = jwt.verify(token, JWT_SECRET, (err, res) => {
       if (err) {
@@ -871,22 +944,37 @@ app.post("/picUpload", async (req, res) => {
         if (err) {
           res.status(500).send({ message: "File upload failed", code: 200 });
         } else {
-          res.status(200).send({ message: "File Uploaded", data: "http://127.0.0.1:5000/profiles/"+filename, code: 200 });
+          res.status(200).send({
+            message: "File Uploaded",
+            data: "http://127.0.0.1:5000/profiles/" + filename,
+            code: 200,
+          });
         }
       });
     }
-  
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
   }
 });
 
-app.post("/createTeam", async (req, res) => {                             // done
-  const {name, sportsTypeId, gender, members, description, profilePic, profileBanner, token} = req.body;
+app.post("/createTeam", async (req, res) => {
+  // done
+  const {
+    name,
+    sportsTypeId,
+    gender,
+    members,
+    description,
+    profilePic,
+    profileBanner,
+    token,
+  } = req.body;
 
   // Create a random invite code
-  const inviteCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const inviteCode =
+    Math.random().toString(36).substring(2, 15) +
+    Math.random().toString(36).substring(2, 15);
 
   try {
     // Get the user email from the token
@@ -918,7 +1006,8 @@ app.post("/createTeam", async (req, res) => {                             // don
           inviteCode: inviteCode,
         });
 
-        team.save()
+        team
+          .save()
           .then(async (data) => {
             const teamId = data._id;
 
@@ -930,15 +1019,15 @@ app.post("/createTeam", async (req, res) => {                             // don
             });
 
             try {
-              for(let member of members) {
+              for (let member of members) {
                 const teamMember = new TeamMembers({
                   team: teamId,
                   user: member,
-                  role: ""
-                })
-                await teamMember.save()
+                  role: "",
+                });
+                await teamMember.save();
               }
-              const data = await teamAdminMember.save()
+              const data = await teamAdminMember.save();
               res.send({ status: "ok", data: data });
             } catch (error) {
               res.send({ status: "error", data: error });
@@ -959,7 +1048,17 @@ app.post("/createTeam", async (req, res) => {                             // don
 
 app.post("/updateTeam", async (req, res) => {
   // Function for team admins to update the team data
-  let {teamId, name, sportsTypeId, gender, ageGroup, description, profilePic, profileBanner, token} = req.body;
+  let {
+    teamId,
+    name,
+    sportsTypeId,
+    gender,
+    ageGroup,
+    description,
+    profilePic,
+    profileBanner,
+    token,
+  } = req.body;
 
   try {
     // Get the user email from the token
@@ -986,25 +1085,25 @@ app.post("/updateTeam", async (req, res) => {
               // Update the team data
 
               // If a value is not provided, then the value will be set to the previous value
-              if(name == null || name == "") {
+              if (name == null || name == "") {
                 name = data.name;
               }
-              if(sportsTypeId == null || sportsTypeId == "") {
+              if (sportsTypeId == null || sportsTypeId == "") {
                 sportsTypeId = data.sportsTypeId;
               }
-              if(gender == null || gender == "") {
+              if (gender == null || gender == "") {
                 gender = data.gender;
               }
-              if(ageGroup == null || ageGroup == "") {
+              if (ageGroup == null || ageGroup == "") {
                 ageGroup = data.ageGroup;
               }
-              if(description == null || description == "") {
+              if (description == null || description == "") {
                 description = data.description;
               }
-              if(profilePic == null || profilePic == "") {
+              if (profilePic == null || profilePic == "") {
                 profilePic = data.profilePic;
               }
-              if(profileBanner == null || profileBanner == "") {
+              if (profileBanner == null || profileBanner == "") {
                 profileBanner = data.profileBanner;
               }
 
@@ -1018,7 +1117,7 @@ app.post("/updateTeam", async (req, res) => {
                   description: description,
                   profilePic: profilePic,
                   profileBanner: profileBanner,
-                }
+                },
               )
                 .then((data) => {
                   res.send({ status: "ok", data: "Successfully updated team" });
@@ -1027,7 +1126,10 @@ app.post("/updateTeam", async (req, res) => {
                   res.send({ status: "error", data: error });
                 });
             } else {
-              res.send({ status: "error", data: "You are not a admin of this team" });
+              res.send({
+                status: "error",
+                data: "You are not a admin of this team",
+              });
             }
           })
           .catch((error) => {
@@ -1045,7 +1147,7 @@ app.post("/updateTeam", async (req, res) => {
 
 app.post("/getTeams", async (req, res) => {
   const { token } = req.body;
-  
+
   // Get all teams the user is a member of
   const user = jwt.verify(token, JWT_SECRET, (err, res) => {
     if (err) {
@@ -1061,7 +1163,7 @@ app.post("/getTeams", async (req, res) => {
   try {
     // Get the user id from the user email
     User.findOne({ email: userEmail })
-      .then((data) => { 
+      .then((data) => {
         const userId = data._id;
         TeamMembers.find({ user: userId })
           .then((data) => {
@@ -1073,11 +1175,11 @@ app.post("/getTeams", async (req, res) => {
             Team.find({ _id: { $in: teamIds } })
               .then(async (teams) => {
                 for (let team of teams) {
-                  let avatars = []
-                  const members = await TeamMembers.find({team: team._id});
+                  let avatars = [];
+                  const members = await TeamMembers.find({ team: team._id });
                   for (let member of members) {
-                    const userInfo = await User.findOne({_id: member.user})
-                    avatars.push(userInfo.profilePic)
+                    const userInfo = await User.findOne({ _id: member.user });
+                    avatars.push(userInfo.profilePic);
                     if (avatars.length > 4) break;
                   }
                   let teamData = {
@@ -1090,8 +1192,8 @@ app.post("/getTeams", async (req, res) => {
                     description: team.description,
                     profilePic: team.profilePic,
                     profileBanner: team.profileBanner,
-                    createdAt: team.createdAt
-                  }
+                    createdAt: team.createdAt,
+                  };
                   teamsData.push(teamData);
                 }
 
@@ -1115,7 +1217,7 @@ app.post("/getTeams", async (req, res) => {
 });
 app.post("/getAllTeams", async (req, res) => {
   const { token } = req.body;
-  
+
   // Get all teams the user is a member of
   const user = jwt.verify(token, JWT_SECRET, (err, res) => {
     if (err) {
@@ -1131,17 +1233,19 @@ app.post("/getAllTeams", async (req, res) => {
   try {
     // Get the user id from the user email
     const userInfo = await User.findOne({ email: userEmail });
-    const yourTeams = await TeamMembers.find({user: userInfo._id});
-    const yourTeamsIds = yourTeams.map(team => team.team.toString());
+    const yourTeams = await TeamMembers.find({ user: userInfo._id });
+    const yourTeamsIds = yourTeams.map((team) => team.team.toString());
     const allTeams = await Team.find();
-    const extraTeams = allTeams.filter(team => yourTeamsIds.indexOf(team._id.toString()) < 0)
-    let teamsData = []
+    const extraTeams = allTeams.filter(
+      (team) => yourTeamsIds.indexOf(team._id.toString()) < 0,
+    );
+    let teamsData = [];
     for (let team of extraTeams) {
-      let avatars = []
-      const members = await TeamMembers.find({team: team._id});
+      let avatars = [];
+      const members = await TeamMembers.find({ team: team._id });
       for (let member of members) {
-        const userInfo = await User.findOne({_id: member.user})
-        avatars.push(userInfo.profilePic)
+        const userInfo = await User.findOne({ _id: member.user });
+        avatars.push(userInfo.profilePic);
         if (avatars.length > 4) break;
       }
       let teamData = {
@@ -1154,12 +1258,11 @@ app.post("/getAllTeams", async (req, res) => {
         description: team.description,
         profilePic: team.profilePic,
         profileBanner: team.profileBanner,
-        createdAt: team.createdAt
-      }
+        createdAt: team.createdAt,
+      };
       teamsData.push(teamData);
     }
     res.send({ status: "ok", data: teamsData });
-
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -1178,13 +1281,13 @@ app.post("/getTeamMembers", async (req, res) => {
     if (user == "token expired") {
       return res.send({ status: "error", data: "token expired" });
     }
-    
+
     TeamMembers.find({ team: teamId })
       .then((teamMembersData) => {
         let teamMembers = [];
         let userIds = [];
         teamMembersData.forEach((user) => {
-          if(user.role == undefined){
+          if (user.role == undefined) {
             user.role = "Member";
           }
           teamMembers.push([user.user, user.role]);
@@ -1215,7 +1318,7 @@ app.post("/getTeamMembers", async (req, res) => {
                 profileBanner: user.profileBanner,
                 createdAt: user.createdAt,
                 role: role,
-              }
+              };
               usersData.push(userData);
             });
             res.send({ status: "ok", data: usersData });
@@ -1237,14 +1340,13 @@ app.get("/getSports", async (req, res) => {
   let sportsData = [];
   Sports.find()
     .then((data) => {
-
       data.forEach((sport) => {
         let sportData = {
           id: sport._id,
           name: sport.name,
           description: sport.description,
           profilePic: sport.profilePic,
-        }
+        };
         sportsData.push(sportData);
       });
 
@@ -1256,28 +1358,40 @@ app.get("/getSports", async (req, res) => {
 });
 
 app.get("/getSports/:id", async (req, res) => {
-  let sportId = req.params.id
+  let sportId = req.params.id;
   try {
-    Sports.findOne({ "_id": sportId })
+    Sports.findOne({ _id: sportId })
       .then((data) => {
         let sportData = {
           id: data._id,
           name: data.name,
           description: data.description,
           profilePic: data.profilePic,
-        }
+        };
         res.send({ status: "ok", data: sportData });
       })
       .catch((error) => {
         res.send({ status: "error", data: error });
       });
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 });
 
 app.post("/createEvent", async (req, res) => {
-  const { token, name, description, location, date, startTime, endTime, teamId, repeat, members, cost } = req.body;
+  const {
+    token,
+    name,
+    description,
+    location,
+    date,
+    startTime,
+    endTime,
+    teamId,
+    repeat,
+    members,
+    cost,
+  } = req.body;
   try {
     const user = jwt.verify(token, JWT_SECRET, (err, res) => {
       if (err) {
@@ -1289,7 +1403,7 @@ app.post("/createEvent", async (req, res) => {
       return res.send({ status: "error", data: "token expired" });
     }
 
-    const creator = await User.findOne({email: user.email})
+    const creator = await User.findOne({ email: user.email });
 
     const newEvent = new Event({
       name,
@@ -1301,7 +1415,7 @@ app.post("/createEvent", async (req, res) => {
       team: teamId,
       repeat,
       members,
-      cost
+      cost,
     });
 
     newEvent.save();
@@ -1322,7 +1436,6 @@ app.post("/createEvent", async (req, res) => {
       newUserEvent.save();
     }
     res.send({ status: "ok", data: "Event Created" });
-
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -1344,52 +1457,49 @@ app.post("/getEvents", async (req, res) => {
     const userEmail = user.email;
 
     // Get the user id from the user email
-    User.findOne({ email: userEmail })
-      .then((data) => {
-        const user = userId ? userId : data._id;
+    User.findOne({ email: userEmail }).then((data) => {
+      const user = userId ? userId : data._id;
 
-        UserEvents.find({ user: user, status: status })
-          .then((data) => {
-
-            let eventIds = [];
-            data.forEach((event) => {
-              eventIds.push(event.event);
-            });
-            let eventsData = [];
-            Event.find({ _id: { $in: eventIds } })
-              .then(async (data) => {
-                for (let event of data) {
-                  const teamInfo = await Team.findOne({_id: event.team})
-                  const sportInfo = await Sports.findById(teamInfo.sportsType)
-                  let eventData = {
-                    id: event._id,
-                    name: event.name,
-                    sport: sportInfo.name,
-                    description: event.description,
-                    location: event.location,
-                    date: event.date,
-                    startTime: event.startTime,
-                    endTime: event.endTime,
-                    teamName: teamInfo.name,
-                    opponentName: event.opponent,
-                    repeat: event.repeat,
-                    cost: event.cost
-                  }
-  
-                  eventsData.push(eventData);
-                }
-
-                res.send({ status: "ok", data: eventsData });
-              })
-              .catch((error) => {
-                res.send({ status: "error", data: error });
-              });
-          })
-          .catch((error) => {
-            res.send({ status: "error", data: error });
+      UserEvents.find({ user: user, status: status })
+        .then((data) => {
+          let eventIds = [];
+          data.forEach((event) => {
+            eventIds.push(event.event);
           });
-      })
+          let eventsData = [];
+          Event.find({ _id: { $in: eventIds } })
+            .then(async (data) => {
+              for (let event of data) {
+                const teamInfo = await Team.findOne({ _id: event.team });
+                const sportInfo = await Sports.findById(teamInfo.sportsType);
+                let eventData = {
+                  id: event._id,
+                  name: event.name,
+                  sport: sportInfo.name,
+                  description: event.description,
+                  location: event.location,
+                  date: event.date,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                  teamName: teamInfo.name,
+                  opponentName: event.opponent,
+                  repeat: event.repeat,
+                  cost: event.cost,
+                };
 
+                eventsData.push(eventData);
+              }
+
+              res.send({ status: "ok", data: eventsData });
+            })
+            .catch((error) => {
+              res.send({ status: "error", data: error });
+            });
+        })
+        .catch((error) => {
+          res.send({ status: "error", data: error });
+        });
+    });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -1411,19 +1521,20 @@ app.post("/acceptEventInvite", async (req, res) => {
     const userEmail = user.email;
 
     // Get the user id from the user email
-    User.findOne({ email: userEmail })
-      .then((data) => {
-        const userId = data._id;
+    User.findOne({ email: userEmail }).then((data) => {
+      const userId = data._id;
 
-        UserEvents.findOneAndUpdate({ user: userId, event: eventId }, { status: "Accepted" })
-          .then((data) => {
-            res.send({ status: "ok", data: "Event Accepted" });
-          })
-          .catch((error) => {
-            res.send({ status: "error", data: error });
-          });
-      })
-      
+      UserEvents.findOneAndUpdate(
+        { user: userId, event: eventId },
+        { status: "Accepted" },
+      )
+        .then((data) => {
+          res.send({ status: "ok", data: "Event Accepted" });
+        })
+        .catch((error) => {
+          res.send({ status: "error", data: error });
+        });
+    });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -1445,19 +1556,20 @@ app.post("/rejectEventInvite", async (req, res) => {
     const userEmail = user.email;
 
     // Get the user id from the user email
-    User.findOne({ email: userEmail })
-      .then((data) => {
-        const userId = data._id;
+    User.findOne({ email: userEmail }).then((data) => {
+      const userId = data._id;
 
-        UserEvents.findOneAndUpdate({ user: userId, event: eventId }, { status: "Rejected" })
-          .then((data) => {
-            res.send({ status: "ok", data: "Event Rejected" });
-          })
-          .catch((error) => {
-            res.send({ status: "error", data: error });
-          });
-      })
-
+      UserEvents.findOneAndUpdate(
+        { user: userId, event: eventId },
+        { status: "Rejected" },
+      )
+        .then((data) => {
+          res.send({ status: "ok", data: "Event Rejected" });
+        })
+        .catch((error) => {
+          res.send({ status: "error", data: error });
+        });
+    });
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -1470,7 +1582,7 @@ app.listen(5000, () => {
 
 app.get("/forgot-password", async (req, res) => {
   //const { email } = req.body;
-  email = "louisklimek@gmail.com"
+  email = "louisklimek@gmail.com";
 
   try {
     const oldUser = await User.findOne({ email });
@@ -1491,14 +1603,16 @@ app.get("/forgot-password", async (req, res) => {
       auth: {
         type: "OAuth2",
         user: "alimangostudios@gmail.com",
-        clientId: "860363559753-81v9dv2pnk1she3tt8cd6766e6i7t3gl.apps.googleusercontent.com",
+        clientId:
+          "860363559753-81v9dv2pnk1she3tt8cd6766e6i7t3gl.apps.googleusercontent.com",
         clientSecret: "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",
-        refreshToken: "1//04zYDt6CXDlN0CgYIARAAGAQSNwF-L9IrBvykWUdiqP7qy2-zOHoUPSOvazN9csEWNWxVtT61a950aewz4X_qufSz97utRweIi0Q",
-        accessToken: "ya29.a0AbVbY6MhWvUAMTO2FmhlUJ0X2EmeBuE4j2CVZYqm4PAy_nyd876ewhTM36-hvMFffdA5fUA9Q0kLLaKPPasWg8KXYHWKV6HnsgLLCBFlsMU7C0Fh91sL2PF9isX3cVmhEf9VmK7pvaj5mZ_Hg9V4CO996f3gaCgYKAbcSARISFQFWKvPlj2HfONnL874VVnTWL2sJ2w0163",
+        refreshToken:
+          "1//04zYDt6CXDlN0CgYIARAAGAQSNwF-L9IrBvykWUdiqP7qy2-zOHoUPSOvazN9csEWNWxVtT61a950aewz4X_qufSz97utRweIi0Q",
+        accessToken:
+          "ya29.a0AbVbY6MhWvUAMTO2FmhlUJ0X2EmeBuE4j2CVZYqm4PAy_nyd876ewhTM36-hvMFffdA5fUA9Q0kLLaKPPasWg8KXYHWKV6HnsgLLCBFlsMU7C0Fh91sL2PF9isX3cVmhEf9VmK7pvaj5mZ_Hg9V4CO996f3gaCgYKAbcSARISFQFWKvPlj2HfONnL874VVnTWL2sJ2w0163",
         expires: 1484314697598,
       },
     });
-    
 
     var mailOptions = {
       from: "SportsPlatform@gmail.com",
@@ -1515,7 +1629,7 @@ app.get("/forgot-password", async (req, res) => {
       }
     });
     console.log(link);
-  } catch (error) { }
+  } catch (error) {}
 });
 
 app.get("/reset-password/:id/:token", async (req, res) => {
@@ -1555,7 +1669,7 @@ app.post("/reset-password/:id/:token", async (req, res) => {
         $set: {
           password: encryptedPassword,
         },
-      }
+      },
     );
 
     res.render("index", { email: verify.email, status: "verified" });
@@ -1574,62 +1688,54 @@ app.get("/getAllUser", async (req, res) => {
   }
 });
 
-
 app.post("/upload-image", async (req, res) => {
   const { base64 } = req.body;
   try {
     await Images.create({ image: base64 });
-    res.send({ Status: "ok" })
-
+    res.send({ Status: "ok" });
   } catch (error) {
     res.send({ Status: "error", data: error });
-
   }
-})
+});
 
 app.get("/get-image", async (req, res) => {
   try {
-    await Images.find({}).then(data => {
-      res.send({ status: "ok", data: data })
-    })
-
-  } catch (error) {
-
-  }
-})
+    await Images.find({}).then((data) => {
+      res.send({ status: "ok", data: data });
+    });
+  } catch (error) {}
+});
 
 app.get("/paginatedUsers", async (req, res) => {
   const allUser = await User.find({});
-  const page = parseInt(req.query.page)
-  const limit = parseInt(req.query.limit)
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
 
-  const startIndex = (page - 1) * limit
-  const lastIndex = (page) * limit
+  const startIndex = (page - 1) * limit;
+  const lastIndex = page * limit;
 
-  const results = {}
-  results.totalUser=allUser.length;
-  results.pageCount=Math.ceil(allUser.length/limit);
+  const results = {};
+  results.totalUser = allUser.length;
+  results.pageCount = Math.ceil(allUser.length / limit);
 
   if (lastIndex < allUser.length) {
     results.next = {
       page: page + 1,
-    }
+    };
   }
   if (startIndex > 0) {
     results.prev = {
       page: page - 1,
-    }
+    };
   }
   results.result = allUser.slice(startIndex, lastIndex);
-  res.json(results)
-})
-
+  res.json(results);
+});
 
 app.post("/addSportsType", async (req, res) => {
   const { name, description, profilePic, adminKey } = req.body;
-  
 
-  if(adminKey == JWT_SECRET){
+  if (adminKey == JWT_SECRET) {
     try {
       const sportsType = await Sports.create({
         name: name,
@@ -1641,5 +1747,4 @@ app.post("/addSportsType", async (req, res) => {
       res.send({ status: "error", data: error });
     }
   }
-
 });

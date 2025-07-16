@@ -12,6 +12,8 @@ import Hamburger from "assets/hamburger.svg";
 import { useMenu } from "utils";
 import * as icons from "./icons";
 
+import { useWalletLogout } from "hooks/useWalletLogout";
+
 function UserMenuContent() {
   const navigate = useNavigate();
   return (
@@ -70,30 +72,31 @@ function UserMenuTarget({ children }: React.PropsWithChildren) {
   );
 }
 
-function UserProfile({userData} : any) {
+function UserProfile({ userData }: any) {
   return (
-      <>
-            <UserMenuTarget>
-              <p className='ml-8 box-content flex cursor-pointer select-none items-center rounded-md p-2 transition-colors hover:bg-blue-high/10'>
-                {userData.fname} {userData.lname}
-                <img className='ml-1' src={profileDownArrow} />
-              </p>
-            </UserMenuTarget>
+    <>
+      <UserMenuTarget>
+        <p className='ml-8 box-content flex cursor-pointer select-none items-center rounded-md p-2 transition-colors hover:bg-blue-high/10'>
+          {userData.fname} {userData.lname}
+          <img className='ml-1' src={profileDownArrow} />
+        </p>
+      </UserMenuTarget>
 
-            <UserMenuTarget>
-              <img
-                className='ml-4 box-content h-7 w-7 cursor-pointer rounded-full p-2 transition-colors hover:bg-blue-high/10'
-                src={userData.profilePic}
-              />
-            </UserMenuTarget>
-      </>
+      <UserMenuTarget>
+        <img
+          className='ml-4 box-content h-7 w-7 cursor-pointer rounded-full p-2 transition-colors hover:bg-blue-high/10'
+          src={userData.profilePic}
+        />
+      </UserMenuTarget>
+    </>
   );
 }
 
 export function Layout() {
+  useWalletLogout();
   let [open, setOpen] = React.useState(false);
 
-  const [loaded, setLoaded] = useState(false);    
+  const [loaded, setLoaded] = useState(false);
 
   const [userData, setUserData] = useState("");
   const [events, setEvents] = useState([]);
@@ -102,92 +105,92 @@ export function Layout() {
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
-          method: "POST",
-          crossDomain: true,
-          headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Access-Control-Allow-Origin": "*",
-          },
-          body: JSON.stringify({
-          token: window.localStorage.getItem("token"),
-          }),
-      })
+    fetch("http://127.0.0.1:5000/getUserData", {
+      method: "POST",
+      crossDomain: true,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify({
+        token: window.localStorage.getItem("token"),
+      }),
+    })
       .then((res) => res.json())
       .then((data) => {
-          if (data.data.userType == "Admin") {
-              setAdmin(true);
+        if (data.data.userType == "Admin") {
+          setAdmin(true);
+        }
+
+        setUserData(data.data);
+
+        if (data.data == "token expired") {
+          if (window.location.pathname !== "/login") {
+            window.localStorage.clear();
+            window.location.href = "../../login";
           }
-  
-          setUserData(data.data);
-          
-          if (data.data == "token expired") {
-            if (window.location.pathname !== "/login") {
-              window.localStorage.clear();
-              window.location.href = "../../login";
-            }
-          }
+        }
 
       });
 
   }, []);
 
   useEffect(() => {
-    if(!userData) return;
+    if (!userData) return;
 
     fetch("http://127.0.0.1:5000/getEvents", {
-        method: "POST",
-        crossDomain: true,
-        headers: {
+      method: "POST",
+      crossDomain: true,
+      headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
         "Access-Control-Allow-Origin": "*",
-        },
-        body: JSON.stringify({
+      },
+      body: JSON.stringify({
         token: window.localStorage.getItem("token"),
         status: "Pending Invite"
-        }),
+      }),
     })
-    .then((res) => res.json())
-    .then((data) => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.data == "token expired") {
           return;
         }
         setEvents(data.data);
-    });
+      });
   }, [userData]);
-  
+
   useEffect(() => {
-    if(!events) return;
+    if (!events) return;
 
     fetch("http://127.0.0.1:5000/getFriendRequests", {
-        method: "POST",
-        crossDomain: true,
-        headers: {
+      method: "POST",
+      crossDomain: true,
+      headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
         "Access-Control-Allow-Origin": "*",
-        },
-        body: JSON.stringify({
+      },
+      body: JSON.stringify({
         token: window.localStorage.getItem("token"),
-        }),
+      }),
     })
-    .then((res) => res.json())
-    .then((data) => {
+      .then((res) => res.json())
+      .then((data) => {
         setLoaded(true);
 
         if (data.data == "token expired") {
           return;
         }
         setFriendRequests(data.data);
-    });
+      });
   }, [events]);
 
   return (
     <>
       {!loaded && (
-          <BarLoader color="#5ce5e2" 
+        <BarLoader color="#5ce5e2"
           cssOverride={{
             display: "block",
             margin: "10vh auto",
@@ -198,8 +201,8 @@ export function Layout() {
       )}
       {loaded && (
         <>
-        <LayoutSidebar open={open} setOpen={setOpen} userData={userData} />
-        <ContentPane setOpen={setOpen} userData={userData} events={events} friendRequests={friendRequests} />
+          <LayoutSidebar open={open} setOpen={setOpen} userData={userData} />
+          <ContentPane setOpen={setOpen} userData={userData} events={events} friendRequests={friendRequests} />
         </>
       )}
 
@@ -217,12 +220,12 @@ function ContentPane({ setOpen, userData, events, friendRequests }: any) {
     events.forEach((event: any) => {
       event.type = "eventInvite";
     });
-  
+
     // Set type in friend requests array to "friendRequest"
     friendRequests.forEach((friendRequest: any) => {
       friendRequest.type = "friendRequest";
     });
-  
+
     // Combine events and friend requests into notifications array
     let notificationsTemp = events.concat(friendRequests);
     setNotifications(notificationsTemp)

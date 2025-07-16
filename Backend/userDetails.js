@@ -11,11 +11,13 @@ const UserDetailsScehma = new mongoose.Schema(
     description: String,
     profilePic: String,
     profileBanner: String,
+    walletAddress: { type: String, unique: true, sparse: true },
+    chainId: { type: String, unique: false, sparse: true },
   },
   { timestamps: true },
   {
     collection: "UserInfo",
-  }
+  },
 );
 
 mongoose.model("UserInfo", UserDetailsScehma);

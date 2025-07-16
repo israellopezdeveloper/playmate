@@ -64,7 +64,7 @@ function MainContent() {
   );
 }
 
-function SideView({events} : any) {
+function SideView({ events }: any) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   return (
     <section className=''>
@@ -89,7 +89,7 @@ function SideView({events} : any) {
 
 export function Dashboard() {
 
-  const [loaded, setLoaded] = useState(false);    
+  const [loaded, setLoaded] = useState(false);
 
   const [userData, setUserData] = useState("");
   const [events, setEvents] = useState([]);
@@ -98,87 +98,87 @@ export function Dashboard() {
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
-          method: "POST",
-          crossDomain: true,
-          headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Access-Control-Allow-Origin": "*",
-          },
-          body: JSON.stringify({
-          token: window.localStorage.getItem("token"),
-          }),
-      })
+    fetch("http://127.0.0.1:5000/getUserData", {
+      method: "POST",
+      crossDomain: true,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify({
+        token: window.localStorage.getItem("token"),
+      }),
+    })
       .then((res) => res.json())
       .then((data) => {
-          if (data.data.userType == "Admin") {
-              setAdmin(true);
+        if (data.data.userType == "Admin") {
+          setAdmin(true);
+        }
+
+        setUserData(data.data);
+
+        if (data.data == "token expired") {
+          if (window.location.pathname !== "/login") {
+            window.localStorage.clear();
+            window.location.href = "../../login";
           }
-  
-          setUserData(data.data);
-          
-          if (data.data == "token expired") {
-            if (window.location.pathname !== "/login") {
-              window.localStorage.clear();
-              window.location.href = "../../login";
-            }
-          }
+        }
 
       });
 
   }, []);
 
   useEffect(() => {
-    if(!userData) return;
+    if (!userData) return;
 
     fetch("http://127.0.0.1:5000/getEvents", {
-        method: "POST",
-        crossDomain: true,
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
-        body: JSON.stringify({
-          token: window.localStorage.getItem("token"),
-          status: "Accepted"
-        }),
-    })
-    .then((res) => res.json())
-    .then((data) => {
-        setEvents(data.data);
-    });
-  }, [userData]);
-  
-  useEffect(() => {
-    if(!events) return;
-
-    fetch("http://127.0.0.1:5000/getFriendRequests", {
-        method: "POST",
-        crossDomain: true,
-        headers: {
+      method: "POST",
+      crossDomain: true,
+      headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
         "Access-Control-Allow-Origin": "*",
-        },
-        body: JSON.stringify({
+      },
+      body: JSON.stringify({
         token: window.localStorage.getItem("token"),
-        }),
+        status: "Accepted"
+      }),
     })
-    .then((res) => res.json())
-    .then((data) => {
+      .then((res) => res.json())
+      .then((data) => {
+        setEvents(data.data);
+      });
+  }, [userData]);
+
+  useEffect(() => {
+    if (!events) return;
+
+    fetch("http://127.0.0.1:5000/getFriendRequests", {
+      method: "POST",
+      crossDomain: true,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify({
+        token: window.localStorage.getItem("token"),
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
         setFriendRequests(data.data);
         setLoaded(true);
-    });
+      });
   }, [events]);
 
   return (
-    <PageView title='Welcome Andrew'>
+    <PageView title={`Welcome ${userData.fname}`} >
       <div className='flex flex-col gap-x-5 gap-y-16 desktop:flex-row desktop:items-start'>
         <MainContent />
         <SideView events={events} />
       </div>
-    </PageView>
+    </PageView >
   );
 }
