@@ -25,7 +25,7 @@ npm start
 
 ## Run with Docker Compose
 
-Alternatively, you can run both frontend and backend using Docker Compose.
+Alternatively, you can run both frontend and backend using Docker Compose
 
 From the project root, run:
 
@@ -37,4 +37,3 @@ This will start all services defined in the `docker-compose.yml` file.
 
 - Frontend will be available at: [http://localhost:3000](http://localhost:3000)
 - Backend will be available at: [http://localhost:5000](http://localhost:5000)
-
